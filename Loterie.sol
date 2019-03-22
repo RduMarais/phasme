@@ -1,33 +1,32 @@
 pragma solidity ^0.5.0;
 // indique la version du compilateur
 
-contract Roulette { 
+contract Loterie { 
 
 	// -------------------- variables -----------------------------------------	
 	uint public lastRoundTimestamp;
 	uint public nextRoundTimestamp; 
 	uint _interval; 
-	address _creator;
+	uint _bloc_cible; // le bloc sur le nonce duquel les participants vont parier
+	address _organisation; //l'organisation de la loterie
+	address _beneficiaire; //l'ONG bénéficiant de la loterie
 
-	enum BetType { Single, Odd, Even }
-	// romain : pour une raison obscure, lorsqu'il y a un } à la fin de ligne, un ; n'est pas attendu
-	struct Bet { 
-		BetType betType; 
-		address payable player; 
-		uint number; 
-		uint value; 
+	struct Pari { 
+		address payable participant; 
+		uint nonce_deviné; 
+		uint mise; 
 	}
-	Bet[] public bets;
+	Pari[] public paris;
 
 	event Finished(uint number, uint nextRoundTimestamp);
 	// fin des variables
 
 	// -------------------- constructeur --------------------------------------
 	// ici encore la syntaxe de la doc est dépréciée, il faut utiliser le constructeur prévu ("constructor(...) { ... }")
-	constructor(uint interval) public { 
-		_interval = interval; 
-		_creator = msg.sender; //msg est le message qui appelle le smart contract
-		nextRoundTimestamp = now + _interval; 
+	constructor(uint bloc_cible) public { 
+		_bloc_cible = bloc_cible; 
+		_organisation = msg.sender; //msg est le message qui appelle le smart contract
+		//nextRoundTimestamp = now + _interval; //à calculer 
 	}
 
 
@@ -41,13 +40,14 @@ contract Roulette {
     }
 	// contrairement à ce qui est indiqué dans la doc, il faut mettre un ";" après l'underscore
 
+	// dans le business model de la Loterie cette méthode n'est pas pertinente
 	// parcourt les paris en cours pour calculer la somme maximale que la banque devra payer si tous les joueurs gagnent
-	modifier bankMustBeAbleToPayForBetType(BetType betType) { 
+	modifier bankMustBeAbleToPayForPariType(PariType betType) { 
 		uint necessaryBalance = 0; 
-		for (uint i = 0; i < bets.length; i++) { 
-			necessaryBalance += getPayoutForType(bets[i].betType) * bets[i].value; 
+		for (uint i = 0; i < paris.length; i++) { 
+			necessaryBalance += paris[i].mise; 
 		}
-		necessaryBalance += getPayoutForType(betType) * msg.value;
+		necessaryBalance += msg.mise;
 		if (necessaryBalance > address(this).balance) require(false); 
 		_ ;
 	}
@@ -55,67 +55,78 @@ contract Roulette {
 
 
 	// -------------------- parier -----------------------------------------
-	// fonction betSingle publique = appelée par tout le monde
 	// plein de modifiers qui vérifient la validité de l'appel
-	function betSingle(uint number) public payable transactionMustContainEther() bankMustBeAbleToPayForBetType(BetType.Single) {
+	/*function betSingle(uint number) public payable transactionMustContainEther() bankMustBeAbleToPayForPariType(PariType.Single) {
 		if (number > 36) require(false); // arrête l'éxécution si pb
-		bets.push(Bet({
-			 betType: BetType.Single, player: msg.sender, number: number, value: msg.value 
-		})); 		// parcourt les paris de type single (sur un chiffre) et les ajoute au tableau bets
+		paris.push(Pari({
+			 betType: PariType.Single, participant: msg.sender, number: number, mise: msg.value 
+		})); 		// parcourt les paris de type single (sur un chiffre) et les ajoute au tableau paris
 	}
 
-	function betEven() public payable transactionMustContainEther() bankMustBeAbleToPayForBetType(BetType.Even) {
-		bets.push(Bet({
-			betType: BetType.Even, player: msg.sender, number: 0, value: msg.value 
+	function betEven() public payable transactionMustContainEther() bankMustBeAbleToPayForPariType(PariType.Even) {
+		paris.push(Pari({
+			betType: PariType.Even, participant: msg.sender, number: 0, mise: msg.value 
+		}));
+	}*/
+
+	// parier
+	// TODO : nonce sur lequel il parie
+	function parier() public payable transactionMustContainEther(){
+		paris.push(Pari({
+			participant: msg.sender, nonce_deviné: 0, mise: msg.value 
 		}));
 	}
 
 	// --------------------- sorte d'API mais dans la Blockchain -----------------
 	// contrairement à ce qui est indiqué dans la doc, le modifier "constant" est déprécié, il faut utiliser "view"
-	function getBetsCountAndValue() public view returns(uint, uint) {
-		uint value = 0;
-		for (uint i = 0; i < bets.length; i++) {
-			value += bets[i].value;
+	function getParisCountAndValue() public view returns(uint, uint) {
+		uint gain = 0;
+		for (uint i = 0; i < paris.length; i++) {
+			gain += paris[i].mise;
 		}
-		return (bets.length, value); // retourne le nombre de paris et la valeur totale des gains
+		return (paris.length, gain); // retourne le nombre de paris et la valeur totale des gains
 	}
 
 
 	// --------------------- faire tourner la roulette --------------------------
 
 	function launch() public {
+		//TODO : calculer avec l'index du bloc
 		if (now < nextRoundTimestamp) require(false);
 
-		//tirrage de nombre aléatoire en utilisant le hash du bloc précédent
+		//tirage de nombre aléatoire en utilisant le hash du bloc précédent
 		uint number = uint(blockhash(block.number - 1)) % 37;
 		
 		// on parcourt tous les paris --> prix en gaz ???
-		for (uint i = 0; i < bets.length; i++) {
+		for (uint i = 0; i < paris.length; i++) {
 			bool won = false; // a priori non gagnant
 			//uint payout = 0; // pas utilisée
-			if (bets[i].betType == BetType.Single) { // parie sur les numéros, gagne si bon numéro
-				if (bets[i].number == number) {
+			if (paris[i].betType == PariType.Single) { // parie sur les numéros, gagne si bon numéro
+				if (paris[i].number == number) {
 					won = true;
 				} 
-			} else if (bets[i].betType == BetType.Even) { //parie sur les blancs, gagne si blanc
+			} else if (paris[i].betType == PariType.Even) { //parie sur les blancs, gagne si blanc
 				if (number > 0 && number % 2 == 0) {
 					won = true;
 				}
-			} else if (bets[i].betType == BetType.Odd) { // parie sur les noirs, gagne si noir
+			} else if (paris[i].betType == PariType.Odd) { // parie sur les noirs, gagne si noir
 				if (number > 0 && number % 2 == 1) {
 					won = true;
 				}
 			}
 			if (won) {
-				bets[i].player.transfer(bets[i].value * getPayoutForType(bets[i].betType)); // apelle get payout coeff
+				paris[i].participant.transfer(paris[i].mise * getPayoutForType(paris[i].betType)); // apelle get payout coeff
 			} 
 		}
+
+		//TODO : reward le bénéficiaire
+		//TODO : reward l'_organisation
 
 		// remise à zéro des compteurs
 		uint thisRoundTimestamp = nextRoundTimestamp;
 		nextRoundTimestamp = thisRoundTimestamp + _interval;
 		lastRoundTimestamp = thisRoundTimestamp;
-		bets.length = 0;
+		paris.length = 0;
 
 		emit Finished(number, nextRoundTimestamp); 
 	}
@@ -123,9 +134,9 @@ contract Roulette {
 	// renvoie le coeff pour le prix gagnant
 	// contrairement à ce qui est indiqué dans la doc, le modifier "constant" est déprécié, il faut utiliser "view"
 	// contrairement à ce qui est indiqué dans la doc, il fauut mettre le modifier public ou private
-	function getPayoutForType(BetType betType) private pure returns(uint) {
-		if (betType == BetType.Single) return 35;
-		if (betType == BetType.Even || betType == BetType.Odd) return 2;
+	function getPayoutForType(PariType betType) private pure returns(uint) {
+		if (betType == PariType.Single) return 35;
+		if (betType == PariType.Even || betType == PariType.Odd) return 2;
 		return 0;
 	}
 }

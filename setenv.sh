@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt-get upgrade nodejs
+sudo apt-get install nodejs
 
 #npm : node modules manager
 sudo apt-get install npm
