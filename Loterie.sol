@@ -42,28 +42,28 @@ contract Loterie {
 
 	// dans le business model de la Loterie cette méthode n'est pas pertinente
 	// parcourt les paris en cours pour calculer la somme maximale que la banque devra payer si tous les joueurs gagnent
-	modifier bankMustBeAbleToPayForPariType(PariType betType) { 
-		uint necessaryBalance = 0; 
-		for (uint i = 0; i < paris.length; i++) { 
-			necessaryBalance += paris[i].mise; 
-		}
-		necessaryBalance += msg.mise;
-		if (necessaryBalance > address(this).balance) require(false); 
-		_ ;
-	}
+	// modifier bankMustBeAbleToPayForPariType(PariType betType) { 
+	// 	uint necessaryBalance = 0; 
+	// 	for (uint i = 0; i < paris.length; i++) { 
+	// 		necessaryBalance += paris[i].mise; 
+	// 	}
+	// 	necessaryBalance += msg.mise;
+	// 	if (necessaryBalance > address(this).balance) require(false); 
+	// 	_ ;
+	// }
 	// contrairement à ce qui est indiqué dans la doc, il faut mettre un ";" après l'underscore
 
 
 	// -------------------- parier -----------------------------------------
 	// plein de modifiers qui vérifient la validité de l'appel
-	/*function betSingle(uint number) public payable transactionMustContainEther() bankMustBeAbleToPayForPariType(PariType.Single) {
+	/*function betSingle(uint number) public payable transactionMustContainEther() {
 		if (number > 36) require(false); // arrête l'éxécution si pb
 		paris.push(Pari({
 			 betType: PariType.Single, participant: msg.sender, number: number, mise: msg.value 
 		})); 		// parcourt les paris de type single (sur un chiffre) et les ajoute au tableau paris
 	}
 
-	function betEven() public payable transactionMustContainEther() bankMustBeAbleToPayForPariType(PariType.Even) {
+	function betEven() public payable transactionMustContainEther() {
 		paris.push(Pari({
 			betType: PariType.Even, participant: msg.sender, number: 0, mise: msg.value 
 		}));
@@ -95,48 +95,24 @@ contract Loterie {
 		if (now < nextRoundTimestamp) require(false);
 
 		//tirage de nombre aléatoire en utilisant le hash du bloc précédent
-		uint number = uint(blockhash(block.number - 1)) % 37;
+		uint nonce = uint(blockhash(block.nonce)); // TODO : on ne considère que les derniers chiffres
+		uint gain;
 		
-		// on parcourt tous les paris --> prix en gaz ???
-		for (uint i = 0; i < paris.length; i++) {
-			bool won = false; // a priori non gagnant
-			//uint payout = 0; // pas utilisée
-			if (paris[i].betType == PariType.Single) { // parie sur les numéros, gagne si bon numéro
-				if (paris[i].number == number) {
-					won = true;
-				} 
-			} else if (paris[i].betType == PariType.Even) { //parie sur les blancs, gagne si blanc
-				if (number > 0 && number % 2 == 0) {
-					won = true;
-				}
-			} else if (paris[i].betType == PariType.Odd) { // parie sur les noirs, gagne si noir
-				if (number > 0 && number % 2 == 1) {
-					won = true;
-				}
-			}
-			if (won) {
-				paris[i].participant.transfer(paris[i].mise * getPayoutForType(paris[i].betType)); // apelle get payout coeff
-			} 
+		for (uint i = 0; i < paris.length; i++){
+			uint[] nonce_diffs;
+			nonce_diffs[i] = uint(paris.nonce_deviné - nonce) // toujours positif
+			// TODO : déterminer l'écart minimum
 		}
+		// on parcourt tous les paris --> prix en gaz ??
+		uint j = 0;
+		while(nonce_diffs[j] > diff_min)
+			// TODO : vérifier que c'est bien l'ordre chronologique
+			j++;
+		}
+		paris[j].participant.transfer(gains * 0.3); // rewarde le vainqueur
+		_organisation.transfer(gains * 0.1); // reward l'_organisation
+		_beneficiaire.transfer(gains * 0.6); // reward le bénéficiaire
 
-		//TODO : reward le bénéficiaire
-		//TODO : reward l'_organisation
-
-		// remise à zéro des compteurs
-		uint thisRoundTimestamp = nextRoundTimestamp;
-		nextRoundTimestamp = thisRoundTimestamp + _interval;
-		lastRoundTimestamp = thisRoundTimestamp;
-		paris.length = 0;
-
-		emit Finished(number, nextRoundTimestamp); 
 	}
 
-	// renvoie le coeff pour le prix gagnant
-	// contrairement à ce qui est indiqué dans la doc, le modifier "constant" est déprécié, il faut utiliser "view"
-	// contrairement à ce qui est indiqué dans la doc, il fauut mettre le modifier public ou private
-	function getPayoutForType(PariType betType) private pure returns(uint) {
-		if (betType == PariType.Single) return 35;
-		if (betType == PariType.Even || betType == PariType.Odd) return 2;
-		return 0;
-	}
 }
