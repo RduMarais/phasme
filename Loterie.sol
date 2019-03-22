@@ -13,7 +13,7 @@ contract Loterie {
 
 	struct Pari { 
 		address payable participant; 
-		uint nonce_deviné; 
+		uint nonce_devine; 
 		uint mise; 
 	}
 	Pari[] public paris;
@@ -73,43 +73,43 @@ contract Loterie {
 	// TODO : nonce sur lequel il parie
 	function parier() public payable transactionMustContainEther(){
 		paris.push(Pari({
-			participant: msg.sender, nonce_deviné: 0, mise: msg.value 
+			//TODO : verifier le cast & la mise en forme de msg data
+			participant: msg.sender, nonce_devine: (uint)msg.data, mise: msg.value 
 		}));
 	}
 
 	// --------------------- sorte d'API mais dans la Blockchain -----------------
-	// contrairement à ce qui est indiqué dans la doc, le modifier "constant" est déprécié, il faut utiliser "view"
+	// retourne le nombre de paris et la valeur totale des gains
 	function getParisCountAndValue() public view returns(uint, uint) {
 		uint gain = 0;
 		for (uint i = 0; i < paris.length; i++) {
 			gain += paris[i].mise;
 		}
-		return (paris.length, gain); // retourne le nombre de paris et la valeur totale des gains
+		return (paris.length, gain);
 	}
 
 
 	// --------------------- faire tourner la roulette --------------------------
 
 	function launch() public {
-		//TODO : calculer avec l'index du bloc
-		if (now < nextRoundTimestamp) require(false);
+		if (block.number < _bloc_cible) require(false);
 
-		//tirage de nombre aléatoire en utilisant le hash du bloc précédent
-		uint nonce = uint(blockhash(block.nonce)); // TODO : on ne considère que les derniers chiffres
+		uint nonce = uint(blockhash(_bloc_cible)); 
+		// TODO : utilser le nonce au lieu du hash
+		// TODO : on ne considère que les derniers chiffres
 		uint gain;
-		
+		uint winner = 0;
+		uint nonce_diff;
+		uint nonce_min = 5000; // arbitrary high value, max of nonce values
 		for (uint i = 0; i < paris.length; i++){
-			uint[] nonce_diffs;
-			nonce_diffs[i] = uint(paris.nonce_deviné - nonce) // toujours positif
-			// TODO : déterminer l'écart minimum
+			nonce_diff = uint(paris.nonce_devine - nonce) // toujours positif
+			if(nonce_diff < nonce_min){
+				winner = i;
+			}
 		}
 		// on parcourt tous les paris --> prix en gaz ??
-		uint j = 0;
-		while(nonce_diffs[j] > diff_min)
-			// TODO : vérifier que c'est bien l'ordre chronologique
-			j++;
-		}
-		paris[j].participant.transfer(gains * 0.3); // rewarde le vainqueur
+		// TODO : vérifier que c'est bien l'ordre chronologique
+		paris[winner].participant.transfer(gains * 0.3); // rewarde le vainqueur
 		_organisation.transfer(gains * 0.1); // reward l'_organisation
 		_beneficiaire.transfer(gains * 0.6); // reward le bénéficiaire
 
