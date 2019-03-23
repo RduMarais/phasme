@@ -2,9 +2,14 @@ pragma solidity ^0.5.0;
 // indique la version du compilateur
 
 // TODO : 
-// uint256 -> uint8
+// uint256 -> uint8 (économiser des gazs)
 // nonce ?
 // nonce max
+// frais de transactions
+
+// TODO (en plus) :
+// bénéficiaires choisis par le vainqueur
+// montant personnalisé
 
 contract Loterie { 
 

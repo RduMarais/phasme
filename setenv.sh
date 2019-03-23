@@ -20,7 +20,8 @@ npm install -g ganache-cli
 truffle init
 
 rm ./contracts/Migrations.sol
-wget https://raw.githubusercontent.com/RduMarais/Roulette.sol/master/Roulette.sol -O ./contracts/Roulette.sol
+wget https://raw.githubusercontent.com/RduMarais/phasme/master/Roulette.sol -O ./contracts/Roulette.sol
+wget https://raw.githubusercontent.com/RduMarais/phasme/master/Loterie.sol -O ./contracts/Loterie.sol
 
 # compile
 truffle compile --network http://127.0.0.1:9545/
